@@ -18,3 +18,6 @@ The software can/will be developed further if there's demand for this kind of pr
 
 Feel free to comment and contribute!
 
+David's Added Features:
+- Grid-based Slicing
+- Radial Slicing
