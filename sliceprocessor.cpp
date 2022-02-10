@@ -54,9 +54,12 @@ float SliceProcessor::blend(float pos) {
 void SliceProcessor::run() {
 
     if (!preview)
+    {
         emit info("Started");
+    }
 
-    if (images.size() < 2) {
+    if (images.size() < 2)
+    {
         emit error("Too few images!");
         return;
     }
