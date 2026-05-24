@@ -37,6 +37,8 @@ public:
     float radial_start;
     float origin_x, origin_y;
     int grid_rows;
+    QString output_folder;
+    int column;
 
 signals:
     void resultReady(const QString &s);

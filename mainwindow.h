@@ -55,6 +55,7 @@ private slots:
 
     void update_preview();
     void preview_ready();
+    void on_output_folder_browse_clicked();
 
 private:
     Ui::MainWindow *ui;

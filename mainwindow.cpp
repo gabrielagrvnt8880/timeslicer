@@ -5,6 +5,7 @@
 #include <QMimeData>
 #include <QDebug>
 #include <QDir>
+#include <QFileInfo>
 #include <QMessageBox>
 #include <QGraphicsPixmapItem>
 
@@ -102,19 +103,32 @@ void MainWindow::on_add_files_btn_clicked()
 
 void MainWindow::on_add_folder_btn_clicked()
 {
-    //
     QFileDialog dialog(this);
     dialog.setFileMode(QFileDialog::Directory);
     dialog.setOption(QFileDialog::ShowDirsOnly, true);
 
     if (dialog.exec()) {
+        QStringList selectedPaths = dialog.selectedFiles();
+        if (!selectedPaths.isEmpty()) {
+            QString folderPath = selectedPaths[0];
+            QDir dir(folderPath);
 
-        // Find all JPEGS
-        //QDir dir(dialog);
-        // if (!dir.exists())
-        //    qWarning("Cannot find the example directory");
+            // Find all JPEG files in the selected folder
+            QStringList filters;
+            filters << "*.jpg" << "*.jpeg" << "*.JPG" << "*.JPEG";
+            dir.setNameFilters(filters);
 
-        //addFiles(dialog.selectedUrls());
+            QFileInfoList fileList = dir.entryInfoList(QDir::Files);
+            QStringList pathList;
+
+            for (const QFileInfo &fileInfo : fileList) {
+                pathList.append(fileInfo.absoluteFilePath());
+            }
+
+            if (!pathList.isEmpty()) {
+                addFiles(pathList);
+            }
+        }
     }
 }
 
@@ -164,6 +178,24 @@ void MainWindow::addFiles(QStringList pathList) {
     }
     images.sort();
 
+    // Set linear_col default to number of images
+    ui->linear_col->setValue(images.size());
+
+    // Set output folder to "Sliced" subfolder in the same directory as the first image
+    if (!pathList.isEmpty()) {
+        QFileInfo firstFile(pathList[0]);
+        QString imageDir = firstFile.absolutePath();
+        QString outputDir = QFileInfo(imageDir, "Sliced").absoluteFilePath();
+
+        // Create the output directory if it doesn't exist
+        QDir dir;
+        if (!dir.exists(outputDir)) {
+            dir.mkpath(outputDir);
+        }
+
+        ui->lineEdit->setText(outputDir);
+    }
+
     ui->statusBar->showMessage(QString("%1 new file(s) were added").arg(pathList.size()));
 
 }
@@ -172,7 +204,8 @@ void MainWindow::addFiles(QStringList pathList) {
 void MainWindow::on_run_button_clicked()
 {
     ui->run_button->setEnabled(false);
-    ui->progressBar->setMaximum(images.size());
+    int num_slices = ui->linear_col->value() > 0 ? ui->linear_col->value() : images.size();
+    ui->progressBar->setMaximum(num_slices);
 
     set_ui_values(false);
     processor.start();
@@ -203,6 +236,8 @@ void MainWindow::set_ui_values(bool for_preview) {
   processor.scale_x = ui->scale_x->value();
   processor.scale_y = ui->scale_y->value();
   processor.blending = ui->blending->value();
+  processor.output_folder = ui->lineEdit->text();
+  processor.column = ui->linear_col->value();
 
   if (ui->linear_button->isChecked()) {
     processor.slice_type = SliceProcessor::SliceType::Linear;
@@ -256,5 +291,18 @@ void MainWindow::preview_ready() {
     p.convertFromImage(processor.preview_image);
     preview_item->setPixmap(p);
 
+}
+
+void MainWindow::on_output_folder_browse_clicked() {
+    QFileDialog dialog(this);
+    dialog.setFileMode(QFileDialog::Directory);
+    dialog.setOption(QFileDialog::ShowDirsOnly, true);
+
+    if (dialog.exec()) {
+        QStringList selectedPaths = dialog.selectedFiles();
+        if (!selectedPaths.isEmpty()) {
+            ui->lineEdit->setText(selectedPaths[0]);
+        }
+    }
 }
 

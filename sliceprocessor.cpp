@@ -3,6 +3,8 @@
 #include <QDebug>
 #include <QImage>
 #include <QColor>
+#include <QDir>
+#include <QFileInfo>
 #include "math.h"
 
 #define DEG2RAD  0.01745329251
@@ -24,6 +26,7 @@ SliceProcessor::SliceProcessor(QObject *parent) :
     origin_x = 0.5f;
     origin_y = 0.0f;
     grid_rows = 2;
+    column = 0;
 }
 
 // QSize thumbnail = size.scaled(200, 200, Qt::KeepAspectRatio);
@@ -69,18 +72,17 @@ void SliceProcessor::run() {
 
     if (preview) {
 
-        // TODO: Better checking here!
-        if (thumbs.empty()) {
-            qDebug() << "Generating smaller images for preview...";
+        // Regenerate thumbnails on each preview run
+        thumbs.clear();
+        qDebug() << "Generating smaller images for preview...";
 
-            if (images.size() > 20) {
-                // TODO: drop the number of images if they are
-            }
+        if (images.size() > 20) {
+            // TODO: drop the number of images if they are
+        }
 
-            for (int i = 0; i < images.size(); i++) {
-                QImage im(images[i]);
-                thumbs.append(im.scaled(800, 800, Qt::KeepAspectRatio));
-            }
+        for (int i = 0; i < images.size(); i++) {
+            QImage im(images[i]);
+            thumbs.append(im.scaled(800, 800, Qt::KeepAspectRatio));
         }
         output = QImage(thumbs[0].size(), QImage::Format_RGB32);
 
@@ -101,28 +103,35 @@ void SliceProcessor::run() {
     float sn = sin(DEG2RAD * angle);
     float cn = cos(DEG2RAD * angle);
 
+    // Use linear_col if set, otherwise use images.size()
+    int num_slices = column > 0 ? column : images.size();
+
     // Radial values
-    float segment_angle = radial_coverage / images.size();
+    float segment_angle = radial_coverage / num_slices;
 
     // Grid values
-    int grid_columns = images.size() / grid_rows;
+    int grid_columns = num_slices / grid_rows;
     float pixels_per_column = output.width() / grid_columns;
     float pixels_per_row = output.height() / grid_rows;
 
     QImage layer;
 
     int i, j;
-    for (int p = 0; p < images.size(); ++p) {
+    for (int p = 0; p < num_slices; ++p) {
 
-        // Layer indexing
-        int pi = reverse ? (images.size() - p - 1) : p;
+        // Layer indexing with wrapping for linear_col
+        int image_index = p % images.size();
+        int pi = reverse ? (images.size() - image_index - 1) : image_index;
 
         // Radial segment
         float this_segment_min = p * segment_angle;
         float this_segment_max = (p + 1) * segment_angle;
 
         if (preview) {
-            layer = thumbs[pi];
+            // Ensure pi is within bounds when wrapping
+            int thumb_index = pi % thumbs.size();
+            if (thumb_index < 0) thumb_index += thumbs.size();
+            layer = thumbs[thumb_index];
         }
         else {
             // Load full resolution image
@@ -173,7 +182,7 @@ void SliceProcessor::run() {
               }
               else {
 
-                b = blend(2 * ((images.size() - 1) * (cx + 0.5) - pi - 1));
+                b = blend(2 * ((num_slices - 1) * (cx + 0.5) - p - 1));
                 if (b < 0.01)
                   continue;
               }
@@ -259,9 +268,24 @@ void SliceProcessor::run() {
 
     }
     else {
-        qDebug() << "Exporting \"time.jpg\"";
-        output.save("time.jpg", "jpg", 90);
-        emit info("Done!");
+        QString outputPath = "time.jpg";
+
+        // Use output folder if specified
+        if (!output_folder.isEmpty()) {
+            QDir outputDir(output_folder);
+            if (!outputDir.exists()) {
+                outputDir.mkpath(".");
+            }
+            outputPath = QFileInfo(output_folder, "time.jpg").absoluteFilePath();
+        }
+
+        qDebug() << "Exporting" << outputPath;
+        if (output.save(outputPath, "jpg", 90)) {
+            emit info("Done!");
+        }
+        else {
+            emit error(QString("Failed to save output to %1").arg(outputPath));
+        }
     }
 
 }
