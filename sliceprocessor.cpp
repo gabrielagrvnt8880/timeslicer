@@ -174,14 +174,16 @@ void SliceProcessor::run() {
               if (px < int(w*(p+1)) + 1 + 1 * oy && p != images.size())
                   continue;*/
 
-              if (pi == 0 && cx < -0.5) {
-
+              // Skip pixels that fall outside the spatial bounds of the current slice
+              // Use the slice index 'p' (spatial slice) rather than 'pi' (image index)
+              // so reversing image order doesn't change spatial boundaries.
+              if (p == 0 && cx < -0.5f) {
+                 
               }
-              else if (pi == images.size() - 1 && cx > 0.5) {
-
+              else if (p == num_slices - 1 && cx > 0.5f) {
+                 
               }
               else {
-
                 b = blend(2 * ((num_slices - 1) * (cx + 0.5) - p - 1));
                 if (b < 0.01)
                   continue;
